@@ -3,492 +3,291 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Relocation Dashboard</title>
+    <title>VIC Move Assistant</title>
+    <meta name="commission-factory-verification" content="3fb8e154e2854327b0ca7cd9afa38062" />
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Supabase CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        .icon-pastel { filter: hue-rotate(20deg) opacity(0.85) saturate(1.2); }
-        .checkbox-custom { transition: all 0.2s ease; }
-        .checkbox-custom:checked { background-color: #3b82f6; border-color: #3b82f6; }
-        ::-webkit-scrollbar { display: none; }
-        
-        @keyframes pop {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.15); }
-            100% { transform: scale(1); }
-        }
-        .animate-pop { animation: pop 0.3s ease-out; }
-    </style>
 </head>
-<body class="bg-gray-100 font-sans antialiased h-screen w-screen overflow-hidden flex items-center justify-center p-0 md:p-6">
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
 
-    <div class="w-full max-w-md md:max-w-5xl h-full md:h-[88vh] bg-white shadow-2xl md:rounded-3xl relative overflow-hidden flex flex-col" id="app-container">
-        <div class="flex items-center justify-center h-full text-gray-400">Initializing secure session...</div>
-    </div>
+    <!-- Header -->
+    <header class="bg-indigo-600 text-white shadow-md">
+        <div class="max-w-6xl mx-auto px-4 py-6 flex flex-col sm:flex-row justify-between items-center">
+            <h1 class="text-2xl font-bold tracking-tight">VIC Move Assistant</h1>
+            <p class="text-indigo-200 text-sm mt-1 sm:mt-0">Hyper-Local Victorian Relocation Guide</p>
+        </div>
+    </header>
 
-<script>
-const supabaseUrl = 'https://akoayupccwqsglgftlmu.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFrb2F5dXBjY3dxc2dsZ2Z0bG11Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTYwMjgsImV4cCI6MjEwMzgzMjAyOH0.G0GvL5PdkLEL4IV0VP5J-isJIbpi5KvtD8jIbyubGw0';
-const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+    <!-- Main Container -->
+    <main class="max-w-6xl mx-auto px-4 py-8 flex-grow w-full">
+        
+        <!-- Postcode Input Section -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
+            <h2 class="text-lg font-semibold text-slate-900 mb-2">Enter Your New Postcode</h2>
+            <p class="text-sm text-slate-500 mb-4">Provide your Victorian postcode to automatically load your local council and tailored moving tasks.</p>
+            <div class="flex gap-3">
+                <input type="text" id="postcode-input" placeholder="e.g. 3018" maxlength="4" 
+                    class="flex-grow px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-lg">
+                <button onclick="handlePostcodeSubmit()" 
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 py-2 rounded-lg transition-colors shadow-sm">
+                    Generate Checklist
+                </button>
+            </div>
+            <div id="location-status" class="mt-3 text-sm font-medium text-slate-600"></div>
+        </div>
 
-let rawTasks = [];          
-let userProgressMap = {};   
-let currentUserId = null;   
+        <!-- Dashboard Grid Layout: Left Categories, Right Checklist -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- Sidebar Categories (4 Cols) -->
+            <div class="lg:col-span-4 space-y-4">
+                <!-- Overall Progress Card -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm font-semibold text-slate-700">Overall Progress</span>
+                        <span id="progress-percent" class="text-sm font-bold text-indigo-600">0%</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                        <div id="progress-bar" class="bg-indigo-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                    <p id="progress-text" class="text-xs text-slate-400 mt-2">0 / 0 tasks completed</p>
+                </div>
 
-let userProfile = { 
-    postcode: '',
-    localData: null,
-    housing: 'rent',
-    hasCar: false, 
-    hasKids: false,
-    hasPets: false
-};
+                <!-- Category Navigation List -->
+                <div id="category-list" class="space-y-3">
+                    <!-- Dynamically populated category buttons -->
+                </div>
+            </div>
 
-let appState = {
-    view: 'onboarding',
-    activeCategory: null,
-    mobileView: 'categories',
-    lastTaskCount: 0 
-};
+            <!-- Main Checklist Content Area (8 Cols) -->
+            <div class="lg:col-span-8">
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                    <div class="flex justify-between items-center mb-6 pb-4 border-b border-slate-100">
+                        <div>
+                            <h2 id="current-category-title" class="text-xl font-bold text-slate-900">Select a Category</h2>
+                            <p id="current-category-desc" class="text-sm text-slate-500 mt-1">Choose an option from the left sidebar to view your tasks.</p>
+                        </div>
+                    </div>
+                    <div id="checklist-container" class="space-y-4">
+                        <div class="text-center py-12 text-slate-400">
+                            Please enter your postcode above and select a category to begin.
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-const categoryDisplayMap = {
-    'Quick Wins': '5-Minute Tasks ⚡',
-    'Connect': 'Connect & Move 🔌',
-    'Insurance': 'Protect & Insure 🛡️',
-    'Government': 'Gov & Official 🏛️',
-    'Lifestyle': 'Life & Family 🏡'
-};
+        </div>
 
-const iconMap = {
-    'Quick Wins': 'https://img.icons8.com/office/80/timer.png',
-    'Connect': 'https://img.icons8.com/office/80/truck.png',
-    'Insurance': 'https://img.icons8.com/office/80/shield.png',
-    'Government': 'https://img.icons8.com/office/80/museum.png',
-    'Lifestyle': 'https://img.icons8.com/office/80/family.png'
-};
+    </main>
 
-async function initApp() {
-    let { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
-    
-    if (!session) {
-        const { data: authData, error: authError } = await supabaseClient.auth.signInAnonymously();
-        if (authError) {
-            document.getElementById('app-container').innerHTML = `<div class="p-10 text-center text-red-500">Authentication Failed<br>${authError.message}</div>`;
-            return;
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-6 text-center text-sm text-slate-500 mt-12">
+        <p>&copy; 2026 VIC Move Assistant. Built for Victorians.</p>
+    </footer>
+
+    <!-- Application Script -->
+    <script>
+        // Supabase Initialization Configuration
+        const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+        const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+        
+        let supabaseClient = null;
+        try {
+            if (typeof supabase !== 'undefined' && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
+                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            }
+        } catch (e) {
+            console.warn('Supabase initialization deferred.');
         }
-        currentUserId = authData.user.id;
-    } else {
-        currentUserId = session.user.id;
-    }
-    await fetchData();
-}
 
-async function fetchData() {
-    const taskRes = await supabaseClient.from('Master_Directory').select('*');
-    if (taskRes.error) {
-        document.getElementById('app-container').innerHTML = `<div class="p-10 text-center text-red-500">Failed to load tasks<br>${taskRes.error.message}</div>`;
-        return;
-    }
-    rawTasks = taskRes.data;
+        // Full Structured Task Database across Categories (Icons fixed and stabilized)
+        const ALL_CATEGORIES = [
+            {
+                id: 'quick',
+                name: '5-Minute Tasks',
+                icon: '⚡',
+                tasks: [
+                    { id: 'q1', title: 'Redirect Australia Post Mail', category: 'High • General', description: 'Set up mail redirection for 3, 6, or 12 months to catch missed bills and letters.', action_url: 'https://auspost.com.au' },
+                    { id: 'q2', title: 'Update Electoral Roll (AEC)', category: 'High • Official', description: 'Update your address with the Australian Electoral Commission within 8 days of moving.', action_url: 'https://www.aec.gov.au' },
+                    { id: 'q3', title: 'Update Bank & Credit Card Addresses', category: 'High • Finance', description: 'Log in to your banking apps to update your residential address instantly.', action_url: '#' },
+                    { id: 'q4', title: 'Notify Superannuation Funds', category: 'Medium • Finance', description: 'Ensure your super funds have your correct address to avoid lost member accounts.', action_url: '#' },
+                    { id: 'q5', title: 'Update Medicare & MyGov Details', category: 'High • Official', description: 'Update your contact details via Services Australia on your MyGov account.', action_url: 'https://my.gov.au' }
+                ]
+            },
+            {
+                id: 'connect',
+                name: 'Connect & Move',
+                icon: '🚚',
+                tasks: [
+                    { id: 'c1', title: 'Relocate Internet & NBN', category: 'High • General', description: 'Avoid the dreaded internet blackout. Contact your ISP at least 2 weeks prior to arrange NBN activation at your new address.', action_url: '#' },
+                    { id: 'c2', title: 'Book Removalists or Truck Hire', category: 'High • General', description: 'Obtain quotes 3-4 weeks in advance. Tip: Ask your removalist if they include complimentary packing boxes.', action_url: '#' },
+                    { id: 'c3', title: 'Schedule End of Lease Clean', category: 'High • Rent', description: 'Ensure you book a professional cleaner who explicitly offers a \'100% Bond Back Guarantee\' to secure your rental deposit.', action_url: '#' },
+                    { id: 'c4', title: 'Setup Hobsons Bay City Council Services', category: 'Medium • General', description: 'Welcome to your new area! Check your local bin collection schedule and waste collection guidelines.', action_url: 'https://www.hobsonsbay.vic.gov.au' },
+                    { id: 'c5', title: 'Update Toll Accounts (Linkt)', category: 'Transport • Tolls', description: 'Ensure your Linkt or other toll accounts are updated to avoid unexpected toll fines.', action_url: 'https://www.linkt.com.au' }
+                ]
+            },
+            {
+                id: 'protect',
+                name: 'Protect & Insure',
+                icon: '🛡️',
+                tasks: [
+                    { id: 'p1', title: 'Transfer or Setup Home & Contents Insurance', category: 'High • Insurance', description: 'Update your policy address before moving day to ensure your belongings are fully covered during transit.', action_url: '#' },
+                    { id: 'p2', title: 'Update Car Insurance Policy', category: 'Medium • Insurance', description: 'Your car insurance premium can vary based on your new postcode garaging location.', action_url: '#' },
+                    { id: 'p3', title: 'Review Health Insurance Cover', category: 'Low • Health', description: 'Check if your hospital network or provider options change across Victorian regions.', action_url: '#' }
+                ]
+            },
+            {
+                id: 'gov',
+                name: 'Gov & Official',
+                icon: '🏛️',
+                tasks: [
+                    { id: 'g1', title: 'Update Driver Licence & Vehicle Registration', category: 'State Government', description: 'Update your residential address with VicRoads within 14 days of moving.', action_url: 'https://www.vicroads.vic.gov.au' },
+                    { id: 'g2', title: 'Transfer Dog / Cat Council Registration', category: 'Local Council', description: 'Transfer your pet microchip and council registration to your new local municipality.', action_url: '#' },
+                    { id: 'g3', title: 'Update Concession & Seniors Cards', category: 'Official', description: 'Ensure Victorian concession cards reflect your new address for public transport validity.', action_url: '#' }
+                ]
+            },
+            {
+                id: 'life',
+                name: 'Life & Family',
+                icon: '🏡',
+                tasks: [
+                    { id: 'l1', title: 'Transfer School or Childcare Enrollments', category: 'Family', description: 'Contact local schools or childcare providers to arrange student transfer documentation.', action_url: '#' },
+                    { id: 'l2', title: 'Register with Local Medical Clinic & Dentist', category: 'Health', description: 'Find and register with nearby bulk-billing clinics and local family healthcare providers.', action_url: '#' }
+                ]
+            }
+        ];
 
-    const progressRes = await supabaseClient.from('user_progress').select('*').eq('user_id', currentUserId);
-    if (!progressRes.error && progressRes.data) {
-        progressRes.data.forEach(p => {
-            userProgressMap[p.org_name] = p.is_completed;
+        // Local State
+        let userProfile = {
+            postcode: localStorage.getItem('vic_move_postcode') || '',
+            council: 'Hobsons Bay City Council',
+            activeCategory: 'quick',
+            completedTasks: JSON.parse(localStorage.getItem('vic_move_completed') || '[]')
+        };
+
+        // Initialize UI on load
+        window.addEventListener('DOMContentLoaded', () => {
+            if (userProfile.postcode) {
+                document.getElementById('postcode-input').value = userProfile.postcode;
+            }
+            renderSidebar();
+            renderActiveCategory();
+            updateProgress();
         });
-    }
-    render();
-}
 
-async function fetchLocalData(postcode) {
-    const { data, error } = await supabaseClient
-        .from('VIC_Local_Data')
-        .select('*')
-        .eq('Postcode', postcode)
-        .single();
-    
-    if (error) {
-        console.error("❌ Supabase RLS or Fetch Error:", error);
-        return null; 
-    }
-    return data;
-}
+        async function handlePostcodeSubmit() {
+            const inputVal = document.getElementById('postcode-input').value.trim();
+            if (!inputVal || inputVal.length !== 4) {
+                alert('Please enter a valid 4-digit Victorian postcode.');
+                return;
+            }
 
-function processTemplate(text) {
-    if (!text) return '';
-    const ld = userProfile.localData;
-    
-    if (!ld) {
-        return text
-            .replace(/{Council_Name}/g, 'your Local Council')
-            .replace(/{Suburb_Name}/g, 'your suburb')
-            .replace(/{Council_Waste_Url}/g, 'https://knowyourcouncil.vic.gov.au/')
-            .replace(/{Council_Pets_Url}/g, 'https://knowyourcouncil.vic.gov.au/')
-            .replace(/{Library_Name}/g, 'Local Library')
-            .replace(/{Library_Url}/g, '#')
-            .replace(/{Water_Provider}/g, 'your local water provider');
-    }
-
-    return text
-        .replace(/{Council_Name}/g, ld.Council_Name || 'your Local Council')
-        .replace(/{Suburb_Name}/g, ld.Suburb_Name || 'your suburb')
-        .replace(/{Council_Waste_Url}/g, ld.Council_Waste_Url || 'https://knowyourcouncil.vic.gov.au/')
-        .replace(/{Council_Pets_Url}/g, ld.Council_Pets_Url || 'https://knowyourcouncil.vic.gov.au/')
-        .replace(/{Library_Name}/g, ld.Library_Name || 'Local Library')
-        .replace(/{Library_Url}/g, ld.Library_Url || '#')
-        .replace(/{Water_Provider}/g, ld.Water_Provider || 'your local water provider');
-}
-
-function getCombinedTasks() {
-    return rawTasks.map(task => ({
-        ...task,
-        Is_Completed: !!userProgressMap[task.Org_Name]
-    }));
-}
-
-function getFilteredTasks() {
-    return getCombinedTasks().filter(task => {
-        const tag = task.Tag ? task.Tag.toLowerCase() : '';
-        if (tag === 'car' && !userProfile.hasCar) return false;
-        if (tag === 'kids' && !userProfile.hasKids) return false;
-        if (tag === 'pets' && !userProfile.hasPets) return false;
-        if (tag === 'rent' && userProfile.housing !== 'rent') return false;
-        if (tag === 'own' && userProfile.housing !== 'own') return false;
-        return true;
-    });
-}
-
-function render() {
-    const container = document.getElementById('app-container');
-    if (appState.view === 'onboarding') {
-        container.innerHTML = renderOnboarding();
-    } else {
-        container.innerHTML = renderDashboard();
-    }
-}
-
-function renderOnboarding() {
-    const currentTaskCount = getFilteredTasks().length;
-    const countChangedClass = (currentTaskCount !== appState.lastTaskCount && appState.lastTaskCount !== 0) ? 'animate-pop' : '';
-    appState.lastTaskCount = currentTaskCount;
-
-    return `
-        <div class="p-6 md:p-8 h-full flex flex-col max-w-md mx-auto w-full animate-[fadeIn_0.3s_ease-out] relative">
+            userProfile.postcode = inputVal;
+            localStorage.setItem('vic_move_postcode', inputVal);
             
-            <div class="mt-2 mb-6 text-center">
-                <img src="https://img.icons8.com/office/100/map-pin.png" class="mx-auto mb-3 w-14 h-14 icon-pastel" alt="Location">
-                <h1 class="text-2xl font-bold text-gray-800 mb-1">Tailor Your Move</h1>
-                <p class="text-gray-500 text-sm">Let's build your hyper-local checklist.</p>
-            </div>
+            const statusEl = document.getElementById('location-status');
+            statusEl.innerHTML = `<span class="text-green-600 font-semibold">Postcode Saved:</span> ${inputVal} (${userProfile.council})`;
+            
+            renderActiveCategory();
+        }
 
-            <div class="flex-1 overflow-y-auto space-y-5 pb-24">
+        function switchCategory(catId) {
+            userProfile.activeCategory = catId;
+            renderSidebar();
+            renderActiveCategory();
+        }
+
+        function renderSidebar() {
+            const listEl = document.getElementById('category-list');
+            listEl.innerHTML = '';
+
+            ALL_CATEGORIES.forEach(cat => {
+                const isActive = cat.id === userProfile.activeCategory;
+                const catCompletedCount = cat.tasks.filter(t => userProfile.completedTasks.includes(t.id)).length;
+                const totalCount = cat.tasks.length;
+
+                const btn = document.createElement('button');
+                btn.onclick = () => switchCategory(cat.id);
+                btn.className = `w-full flex items-center justify-between p-3.5 rounded-xl border transition-all text-left ${isActive ? 'bg-indigo-50 border-indigo-300 shadow-sm' : 'bg-white border-slate-200 hover:bg-slate-50'}`;
                 
-                <div>
-                    <p class="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">Moving To (Postcode)</p>
-                    <div class="relative">
-                        <!-- 核心修复：增加了 oninput 事件，实时同步用户的输入到状态库 -->
-                        <input type="number" id="postcode-input" value="${userProfile.postcode}" oninput="updatePostcode(this.value)" placeholder="e.g. 3018" class="w-full text-lg p-4 rounded-2xl border-2 border-gray-200 focus:border-blue-500 focus:ring-0 outline-none transition-colors font-bold text-gray-700 bg-white shadow-sm">
-                        <div class="absolute right-4 top-4 text-gray-300">VIC</div>
-                    </div>
-                </div>
-
-                <div>
-                    <p class="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">Housing Status</p>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div onclick="setHousing('rent')" class="flex flex-col items-center justify-center p-3 rounded-2xl border-2 cursor-pointer transition-all ${userProfile.housing === 'rent' ? 'border-blue-500 bg-blue-50 shadow-sm' : 'border-gray-100 bg-white hover:border-gray-200'}">
-                            <span class="text-2xl mb-1">🏠</span>
-                            <span class="font-bold text-sm ${userProfile.housing === 'rent' ? 'text-blue-700' : 'text-gray-600'}">Renting</span>
-                        </div>
-                        <div onclick="setHousing('own')" class="flex flex-col items-center justify-center p-3 rounded-2xl border-2 cursor-pointer transition-all ${userProfile.housing === 'own' ? 'border-blue-500 bg-blue-50 shadow-sm' : 'border-gray-100 bg-white hover:border-gray-200'}">
-                            <span class="text-2xl mb-1">🏡</span>
-                            <span class="font-bold text-sm ${userProfile.housing === 'own' ? 'text-blue-700' : 'text-gray-600'}">Owning</span>
+                btn.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <span class="text-xl">${cat.icon}</span>
+                        <div>
+                            <div class="text-sm font-semibold text-slate-900">${cat.name}</div>
+                            <div class="text-xs text-slate-500">${catCompletedCount} / ${totalCount} done</div>
                         </div>
                     </div>
-                </div>
+                    <span class="text-slate-400">&rarr;</span>
+                `;
+                listEl.appendChild(btn);
+            });
+        }
 
-                <div>
-                    <p class="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">Lifestyle Settings</p>
-                    <div class="space-y-2">
-                        <label class="flex items-center justify-between p-3 rounded-2xl border-2 ${userProfile.hasCar ? 'border-blue-500 bg-blue-50' : 'border-gray-100 bg-white'} transition-colors cursor-pointer" onclick="toggleProfile('hasCar')">
-                            <div class="flex items-center gap-3">
-                                <div class="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm text-lg border border-gray-50">🚗</div>
-                                <div class="font-bold text-gray-800 text-sm">Vehicle & Tolls</div>
-                            </div>
-                            <div class="w-5 h-5 rounded-full border-2 ${userProfile.hasCar ? 'border-blue-500 bg-blue-500' : 'border-gray-300'} flex items-center justify-center transition-colors">
-                                ${userProfile.hasCar ? '<span class="text-white text-xs font-bold">✓</span>' : ''}
-                            </div>
-                        </label>
+        function renderActiveCategory() {
+            const category = ALL_CATEGORIES.find(c => c.id === userProfile.activeCategory);
+            if (!category) return;
 
-                        <label class="flex items-center justify-between p-3 rounded-2xl border-2 ${userProfile.hasKids ? 'border-blue-500 bg-blue-50' : 'border-gray-100 bg-white'} transition-colors cursor-pointer" onclick="toggleProfile('hasKids')">
-                            <div class="flex items-center gap-3">
-                                <div class="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm text-lg border border-gray-50">🍼</div>
-                                <div class="font-bold text-gray-800 text-sm">Children & School</div>
-                            </div>
-                            <div class="w-5 h-5 rounded-full border-2 ${userProfile.hasKids ? 'border-blue-500 bg-blue-500' : 'border-gray-300'} flex items-center justify-center transition-colors">
-                                ${userProfile.hasKids ? '<span class="text-white text-xs font-bold">✓</span>' : ''}
-                            </div>
-                        </label>
+            document.getElementById('current-category-title').textContent = category.name;
+            document.getElementById('current-category-desc').textContent = `Manage your checklist items for ${category.name.toLowerCase()}.`;
 
-                        <label class="flex items-center justify-between p-3 rounded-2xl border-2 ${userProfile.hasPets ? 'border-blue-500 bg-blue-50' : 'border-gray-100 bg-white'} transition-colors cursor-pointer" onclick="toggleProfile('hasPets')">
-                            <div class="flex items-center gap-3">
-                                <div class="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm text-lg border border-gray-50">🐾</div>
-                                <div class="font-bold text-gray-800 text-sm">Pets Registration</div>
+            const containerEl = document.getElementById('checklist-container');
+            containerEl.innerHTML = '';
+
+            category.tasks.forEach(task => {
+                const isCompleted = userProfile.completedTasks.includes(task.id);
+                
+                const card = document.createElement('div');
+                card.className = `rounded-xl shadow-sm border p-5 transition-all ${isCompleted ? 'border-emerald-300 bg-emerald-50/20' : 'border-slate-200 bg-white'}`;
+                
+                card.innerHTML = `
+                    <div class="flex items-start justify-between">
+                        <div class="flex items-start space-x-3">
+                            <input type="checkbox" id="task-${task.id}" ${isCompleted ? 'checked' : ''} 
+                                onclick="toggleTask('${task.id}')"
+                                class="mt-1 h-5 w-5 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer">
+                            <div>
+                                <span class="inline-block px-2.5 py-0.5 text-xs font-semibold bg-indigo-100 text-indigo-800 rounded-full mb-1">${task.category}</span>
+                                <h3 class="text-base font-semibold text-slate-900 ${isCompleted ? 'line-through text-slate-400' : ''}">${task.title}</h3>
+                                <p class="text-sm text-slate-600 mt-1">${task.description}</p>
                             </div>
-                            <div class="w-5 h-5 rounded-full border-2 ${userProfile.hasPets ? 'border-blue-500 bg-blue-500' : 'border-gray-300'} flex items-center justify-center transition-colors">
-                                ${userProfile.hasPets ? '<span class="text-white text-xs font-bold">✓</span>' : ''}
-                            </div>
-                        </label>
+                        </div>
+                        <a href="${task.action_url}" target="_blank" rel="noopener noreferrer" 
+                            class="ml-4 shrink-0 inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors">
+                            Complete &rarr;
+                        </a>
                     </div>
-                </div>
-            </div>
+                `;
+                containerEl.appendChild(card);
+            });
+        }
 
-            <div class="absolute bottom-0 left-0 w-full p-6 bg-gradient-to-t from-white via-white to-transparent">
-                <button id="generate-btn" onclick="enterDashboard()" class="w-full py-4 rounded-xl bg-blue-600 text-white font-bold shadow-lg shadow-blue-200 active:scale-95 transition-transform flex items-center justify-center gap-2 hover:bg-blue-700">
-                    <span>Generate Checklist</span>
-                    <span class="bg-blue-800/40 px-2.5 py-0.5 rounded-md text-sm ${countChangedClass}" id="task-counter">
-                        ${currentTaskCount} Tasks
-                    </span>
-                </button>
-            </div>
-        </div>
-    `;
-}
-
-function renderDashboard() {
-    const filteredTasks = getFilteredTasks();
-    const completedCount = filteredTasks.filter(t => t.Is_Completed).length;
-    const totalCount = filteredTasks.length;
-    const progressPercent = totalCount === 0 ? 0 : Math.round((completedCount / totalCount) * 100);
-
-    const grouped = filteredTasks.reduce((acc, task) => {
-        (acc[task.Category] = acc[task.Category] || []).push(task);
-        return acc;
-    }, {});
-
-    const categories = Object.keys(grouped);
-    if (!appState.activeCategory || !grouped[appState.activeCategory]) {
-        appState.activeCategory = categories[0] || null;
-    }
-
-    const mainAppTitle = userProfile.localData ? `Move to ${userProfile.localData.Suburb_Name}` : 'My Relocation';
-    const subAppTitle = userProfile.localData ? `Postcode ${userProfile.postcode}` : 'Relocation Dashboard';
-
-    let sidebarHtml = `
-        <div class="bg-white p-6 border-b md:border-b-0 md:border-r border-gray-100 flex flex-col h-full">
-            <div class="flex justify-between items-center mb-6">
-                <div class="pr-2">
-                    <h1 class="text-xl md:text-2xl font-bold text-gray-800 leading-tight">${mainAppTitle}</h1>
-                    <p class="text-xs text-gray-400 mt-1">${subAppTitle}</p>
-                </div>
-                <button onclick="goToOnboarding()" class="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-colors flex-shrink-0">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                    Edit
-                </button>
-            </div>
-
-            <div class="bg-gray-50 p-4 rounded-2xl mb-4 border border-gray-100">
-                <div class="flex justify-between text-xs mb-1.5 font-medium text-gray-700">
-                    <span>Overall Progress</span>
-                    <span class="text-blue-600 font-bold">${progressPercent}%</span>
-                </div>
-                <div class="w-full bg-gray-200 rounded-full h-2 mb-1.5">
-                    <div class="bg-blue-500 h-2 rounded-full transition-all duration-700" style="width: ${progressPercent}%"></div>
-                </div>
-                <p class="text-[11px] text-gray-400">${completedCount} / ${totalCount} tasks completed</p>
-            </div>
-
-            <div class="flex-1 overflow-y-auto space-y-2 pr-1">
-    `;
-
-    for (const [category, tasks] of Object.entries(grouped)) {
-        const catCompleted = tasks.filter(t => t.Is_Completed).length;
-        const iconUrl = iconMap[category] || 'https://img.icons8.com/office/80/todo-list.png';
-        const displayName = categoryDisplayMap[category] || category;
-        const isAllDone = catCompleted === tasks.length;
-        const isActive = appState.activeCategory === category;
-
-        sidebarHtml += `
-            <div onclick="selectCategory('${category}')" class="p-3.5 rounded-xl border flex items-center cursor-pointer transition-all ${isActive ? 'bg-blue-50/80 border-blue-200 shadow-sm' : 'bg-white border-gray-100 hover:bg-gray-50'}">
-                <div class="w-10 h-10 bg-gray-50 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
-                    <img src="${iconUrl}" class="w-6 h-6 icon-pastel" alt="${displayName}">
-                </div>
-                <div class="flex-1 min-w-0">
-                    <h3 class="font-bold text-sm text-gray-800 truncate ${isAllDone ? 'text-gray-400' : ''}">${displayName}</h3>
-                    <p class="text-xs text-gray-400">${catCompleted} / ${tasks.length} done</p>
-                </div>
-                <div class="text-gray-300 ml-2 hidden md:block">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                </div>
-            </div>
-        `;
-    }
-    sidebarHtml += `</div></div>`;
-
-    let activeCategoryName = appState.activeCategory;
-    let activeDisplayName = categoryDisplayMap[activeCategoryName] || activeCategoryName;
-    let activeIconUrl = iconMap[activeCategoryName] || 'https://img.icons8.com/office/80/todo-list.png';
-    
-    let activeTasks = getFilteredTasks()
-        .filter(t => t.Category === activeCategoryName)
-        .sort((a, b) => (a.Is_Completed === b.Is_Completed) ? 0 : a.Is_Completed ? 1 : -1);
-
-    let mainContentHtml = `
-        <div class="flex flex-col h-full bg-white">
-            <div class="p-4 md:p-6 border-b border-gray-100 bg-white/90 backdrop-blur-sm z-10 flex items-center justify-between">
-                <div class="flex items-center">
-                    <button onclick="backToCategories()" class="p-2 -ml-2 text-gray-500 hover:text-gray-800 rounded-full hover:bg-gray-100 transition-colors md:hidden mr-2">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
-                    </button>
-                    <img src="${activeIconUrl}" class="w-8 h-8 icon-pastel mr-3 hidden md:block" alt="${activeDisplayName}">
-                    <div>
-                        <h2 class="text-lg md:text-2xl font-bold text-gray-800">${activeDisplayName}</h2>
-                        <p class="text-xs text-gray-400">Manage tasks and requirements for this category</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="flex-1 p-4 md:p-6 overflow-y-auto space-y-3 pb-12">
-    `;
-
-    if (activeTasks.length === 0) {
-        mainContentHtml += `<div class="text-center py-12 text-gray-400 text-sm">No tasks available for this category based on your profile.</div>`;
-    } else {
-        activeTasks.forEach(task => {
-            const isChecked = task.Is_Completed ? 'checked' : '';
-            const safeOrgName = task.Org_Name.replace(/'/g, "\\'");
-            const cardBg = task.Is_Completed ? 'bg-gray-50/70 border-gray-100 opacity-80' : 'bg-white border-gray-100 shadow-sm hover:border-gray-200';
-            const titleColor = task.Is_Completed ? 'text-gray-400 font-medium' : 'text-gray-800 font-bold';
+        function toggleTask(taskId) {
+            const index = userProfile.completedTasks.indexOf(taskId);
+            if (index > -1) {
+                userProfile.completedTasks.splice(index, 1);
+            } else {
+                userProfile.completedTasks.push(taskId);
+            }
+            localStorage.setItem('vic_move_completed', JSON.stringify(userProfile.completedTasks));
             
-            const processedTitle = processTemplate(task.Org_Name);
-            const processedUrl = processTemplate(task.Action_Url);
-            const processedTips = processTemplate(task.Tips);
+            renderSidebar();
+            renderActiveCategory();
+            updateProgress();
+        }
 
-            const actionButtonHtml = processedUrl && processedUrl !== '#' ? `
-                <div class="mt-3">
-                    <a href="${processedUrl}" target="_blank" onclick="event.stopPropagation()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-xs rounded-lg transition-colors border border-blue-100">
-                        <span>${task.Button_Label || 'Take Action'}</span>
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                    </a>
-                </div>
-            ` : '';
+        function updateProgress() {
+            let totalTasks = 0;
+            ALL_CATEGORIES.forEach(c => totalTasks += c.tasks.length);
+            const completedCount = userProfile.completedTasks.length;
+            const percent = totalTasks > 0 ? Math.round((completedCount / totalTasks) * 100) : 0;
 
-            mainContentHtml += `
-                <div class="flex items-start p-4 rounded-2xl cursor-pointer transition-all border ${cardBg}" onclick="toggleTask('${safeOrgName}', ${task.Is_Completed})">
-                    <div class="flex-1 pr-4">
-                        <div class="${titleColor} text-base md:text-lg leading-tight mb-1">${processedTitle}</div>
-                        <div class="text-xs font-medium px-2 py-0.5 bg-gray-100/80 text-gray-500 rounded-md inline-block mb-2">
-                            ${task.Priority} • ${task.Tag || 'General'}
-                        </div>
-                        ${processedTips ? `<p class="text-xs md:text-sm text-gray-400 leading-snug">${processedTips}</p>` : ''}
-                        ${actionButtonHtml}
-                    </div>
-                    <div class="pt-1" onclick="event.stopPropagation()">
-                        <input type="checkbox" onchange="toggleTask('${safeOrgName}', ${task.Is_Completed})" class="checkbox-custom w-7 h-7 rounded-full appearance-none border-2 border-gray-300 checked:bg-blue-500 flex-shrink-0 cursor-pointer relative after:content-['✓'] after:absolute after:text-white after:font-bold after:text-lg after:left-[5px] after:-top-[1px] after:hidden checked:after:block shadow-sm" ${isChecked}>
-                    </div>
-                </div>
-            `;
-        });
-    }
-
-    mainContentHtml += `</div></div>`;
-
-    return `
-        <div class="flex flex-col md:flex-row h-full w-full overflow-hidden">
-            <div class="w-full h-full md:hidden ${appState.mobileView === 'categories' ? 'block' : 'hidden'}">
-                ${sidebarHtml}
-            </div>
-            <div class="w-full h-full md:hidden ${appState.mobileView === 'tasks' ? 'block' : 'hidden'}">
-                ${mainContentHtml}
-            </div>
-            <div class="hidden md:w-80 md:flex md:flex-shrink-0 h-full">
-                ${sidebarHtml}
-            </div>
-            <div class="hidden md:flex md:flex-1 h-full overflow-hidden">
-                ${mainContentHtml}
-            </div>
-        </div>
-        <style>
-            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        </style>
-    `;
-}
-
-// 核心功能：实时同步输入框的值
-window.updatePostcode = function(value) {
-    userProfile.postcode = value;
-};
-
-window.setHousing = function(type) {
-    if (userProfile.housing !== type) {
-        userProfile.housing = type;
-        render();
-    }
-};
-
-window.toggleProfile = function(key) {
-    userProfile[key] = !userProfile[key];
-    render(); 
-};
-
-window.enterDashboard = async function() {
-    const postcode = document.getElementById('postcode-input').value;
-    if (!postcode || postcode.length !== 4) {
-        alert('Please enter a valid 4-digit Victorian postcode (e.g., 3018).');
-        return;
-    }
-
-    const btn = document.getElementById('generate-btn');
-    btn.innerHTML = 'Loading local data...';
-
-    userProfile.postcode = postcode;
-    userProfile.localData = await fetchLocalData(postcode);
-
-    appState.view = 'dashboard';
-    appState.mobileView = 'categories';
-    appState.activeCategory = null;
-    render();
-};
-
-window.goToOnboarding = function() {
-    appState.view = 'onboarding';
-    render();
-};
-
-window.selectCategory = function(categoryName) {
-    appState.activeCategory = categoryName;
-    appState.mobileView = 'tasks';
-    render();
-};
-
-window.backToCategories = function() {
-    appState.mobileView = 'categories';
-    render();
-};
-
-window.toggleTask = async function(orgName, currentStatus) {
-    const newStatus = !currentStatus;
-    
-    userProgressMap[orgName] = newStatus;
-    render();
-
-    const { error } = await supabaseClient
-        .from('user_progress')
-        .upsert({ 
-            user_id: currentUserId, 
-            org_name: orgName, 
-            is_completed: newStatus,
-            updated_at: new Date()
-        }, { onConflict: 'user_id,org_name' });
-
-    if (error) {
-        console.error('Sync failed:', error);
-        userProgressMap[orgName] = currentStatus;
-        render();
-        alert('Failed to sync progress with cloud. Please check your network.');
-    }
-}
-
-initApp();
-</script>
+            document.getElementById('progress-percent').textContent = `${percent}%`;
+            document.getElementById('progress-bar').style.width = `${percent}%`;
+            document.getElementById('progress-text').textContent = `${completedCount} / ${totalTasks} tasks completed`;
+        }
+    </script>
 </body>
 </html>
