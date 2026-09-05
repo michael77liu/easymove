@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relocation Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        .icon-pastel { filter: hue-rotate(20deg) opacity(0.85) saturate(1.2); }
+        .checkbox-custom { transition: all 0.2s ease; }
+        .checkbox-custom:checked { background-color: #3b82f6; border-color: #3b82f6; }
+        ::-webkit-scrollbar { display: none; }
+        
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+            100% { transform: scale(1); }
+        }
+        .animate-pop { animation: pop 0.3s ease-out; }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans antialiased h-screen w-screen overflow-hidden flex items-center justify-center p-0 md:p-6">
+
+    <div class="w-full max-w-md md:max-w-5xl h-full md:h-[88vh] bg-white shadow-2xl md:rounded-3xl relative overflow-hidden flex flex-col" id="app-container">
+        <div class="flex items-center justify-center h-full text-gray-400">Initializing secure session...</div>
+    </div>
+
+<script>
+const supabaseUrl = 'https://akoayupccwqsglgftlmu.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFrb2F5dXBjY3dxc2dsZ2Z0bG11Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNTYwMjgsImV4cCI6MjEwMzgzMjAyOH0.G0GvL5PdkLEL4IV0VP5J-isJIbpi5KvtD8jIbyubGw0';
+const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+
+let rawTasks = [];          
+let userProgressMap = {};   
+let currentUserId = null;   
+
+let userProfile = { 
+    postcode: '',
+    localData: null,
+    housing: 'rent',
+    hasCar: false, 
+    hasKids: false,
+    hasPets: false
+};
+
+let appState = {
+    view: 'onboarding',
+    activeCategory: null,
+    mobileView: 'categories',
+    lastTaskCount: 0 
+};
+
+const categoryDisplayMap = {
+    'Quick Wins': '5-Minute Tasks ⚡',
+    'Connect': 'Connect & Move 🔌',
+    'Insurance': 'Protect & Insure 🛡️',
+    'Government': 'Gov & Official 🏛️',
+    'Lifestyle': 'Life & Family 🏡'
+};
+
+const iconMap = {
+    'Quick Wins': 'https://img.icons8.com/office/80/timer.png',
+    'Connect': 'https://img.icons8.com/office/80/truck.png',
+    'Insurance': 'https://img.icons8.com/office/80/shield.png',
+    'Government': 'https://img.icons8.com/office/80/museum.png',
+    'Lifestyle': 'https://img.icons8.com/office/80/family.png'
+};
+
+async function initApp() {
+    let { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
+    
+    if (!session) {
+        const { data: authData, error: authError } = await supabaseClient.auth.signInAnonymously();
+        if (authError) {
+            document.getElementById('app-container').innerHTML = `<div class="p-10 text-center text-red-500">Authentication Failed<br>${authError.message}</div>`;
+            return;
+        }
+        currentUserId = authData.user.id;
+    } else {
+        currentUserId = session.user.id;
+    }
+    await fetchData();
+}
+
+async function fetchData() {
+    const taskRes = await supabaseClient.from('Master_Directory').select('*');
+    if (taskRes.error) {
+        document.getElementById('app-container').innerHTML = `<div class="p-10 text-center text-red-500">Failed to load tasks<br>${taskRes.error.message}</div>`;
+        return;
+    }
+    rawTasks = taskRes.data;
+
+    const progressRes = await supabaseClient.from('user_progress').select('*').eq('user_id', currentUserId);
+    if (!progressRes.error && progressRes.data) {
+        progressRes.data.forEach(p => {
+            userProgressMap[p.org_name] = p.is_completed;
+        });
+    }
+    render();
+}
+
+async function fetchLocalData(postcode) {
+    const { data, error } = await supabaseClient
+        .from('VIC_Local_Data')
+        .select('*')
+        .eq('Postcode', postcode)
+        .single();
+    
+    if (error) {
+        console.error("❌ Supabase RLS or Fetch Error:", error);
+        return null; 
+    }
+    return data;
+}
+
+function processTemplate(text) {
+    if (!text) return '';
+    const ld = userProfile.localData;
+    
+    if (!ld) {
+        return text
+            .replace(/{Council_Name}/g, 'your Local Council')
+            .replace(/{Suburb_Name}/g, 'your suburb')
+            .replace(/{Council_Waste_Url}/g, 'https://knowyourcouncil.vic.gov.au/')
+            .replace(/{Council_Pets_Url}/g, 'https://knowyourcouncil.vic.gov.au/')
+            .replace(/{Library_Name}/g, 'Local Library')
+            .replace(/{Library_Url}/g, '#')
+            .replace(/{Water_Provider}/g, 'your local water provider');
+    }
+
+    return text
+        .replace(/{Council_Name}/g, ld.Council_Name || 'your Local Council')
+        .replace(/{Suburb_Name}/g, ld.Suburb_Name || 'your suburb')
+        .replace(/{Council_Waste_Url}/g, ld.Council_Waste_Url || 'https://knowyourcouncil.vic.gov.au/')
+        .replace(/{Council_Pets_Url}/g, ld.Council_Pets_Url || 'https://knowyourcouncil.vic.gov.au/')
+        .replace(/{Library_Name}/g, ld.Library_Name || 'Local Library')
+        .replace(/{Library_Url}/g, ld.Library_Url || '#')
+        .replace(/{Water_Provider}/g, ld.Water_Provider || 'your local water provider');
+}
+
+function getCombinedTasks() {
+    return rawTasks.map(task => ({
+        ...task,
+        Is_Completed: !!userProgressMap[task.Org_Name]
+    }));
+}
+
+function getFilteredTasks() {
+    return getCombinedTasks().filter(task => {
+        const tag = task.Tag ? task.Tag.toLowerCase() : '';
+        if (tag === 'car' && !userProfile.hasCar) return false;
+        if (tag === 'kids' && !userProfile.hasKids) return false;
+        if (tag === 'pets' && !userProfile.hasPets) return false;
+        if (tag === 'rent' && userProfile.housing !== 'rent') return false;
+        if (tag === 'own' && userProfile.housing !== 'own') return false;
+        return true;
+    });
+}
+
+function render() {
+    const container = document.getElementById('app-container');
+    if (appState.view === 'onboarding') {
+        container.innerHTML = renderOnboarding();
+    } else {
+        container.innerHTML = renderDashboard();
+    }
+}
+
+function renderOnboarding() {
+    const currentTaskCount = getFilteredTasks().length;
+    const countChangedClass = (currentTaskCount !== appState.lastTaskCount && appState.lastTaskCount !== 0) ? 'animate-pop' : '';
+    appState.lastTaskCount = currentTaskCount;
+
+    return `
+        <div class="p-6 md:p-8 h-full flex flex-col max-w-md mx-auto w-full animate-[fadeIn_0.3s_ease-out] relative">
+            
+            <div class="mt-2 mb-6 text-center">
+                <img src="https://img.icons8.com/office/100/map-pin.png" class="mx-auto mb-3 w-14 h-14 icon-pastel" alt="Location">
+                <h1 class="text-2xl font-bold text-gray-800 mb-1">Tailor Your Move</h1>
+                <p class="text-gray-500 text-sm">Let's build your hyper-local checklist.</p>
+            </div>
+
+            <div class="flex-1 overflow-y-auto space-y-5 pb-24">
+                
+                <div>
+                    <p class="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">Moving To (Postcode)</p>
+                    <div class="relative">
+                        <!-- 核心修复：增加了 oninput 事件，实时同步用户的输入到状态库 -->
+                        <input type="number" id="postcode-input" value="${userProfile.postcode}" oninput="updatePostcode(this.value)" placeholder="e.g. 3018" class="w-full text-lg p-4 rounded-2xl border-2 border-gray-200 focus:border-blue-500 focus:ring-0 outline-none transition-colors font-bold text-gray-700 bg-white shadow-sm">
+                        <div class="absolute right-4 top-4 text-gray-300">VIC</div>
+                    </div>
+                </div>
+
+                <div>
+                    <p class="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">Housing Status</p>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div onclick="setHousing('rent')" class="flex flex-col items-center justify-center p-3 rounded-2xl border-2 cursor-pointer transition-all ${userProfile.housing === 'rent' ? 'border-blue-500 bg-blue-50 shadow-sm' : 'border-gray-100 bg-white hover:border-gray-200'}">
+                            <span class="text-2xl mb-1">🏠</span>
+                            <span class="font-bold text-sm ${userProfile.housing === 'rent' ? 'text-blue-700' : 'text-gray-600'}">Renting</span>
+                        </div>
+                        <div onclick="setHousing('own')" class="flex flex-col items-center justify-center p-3 rounded-2xl border-2 cursor-pointer transition-all ${userProfile.housing === 'own' ? 'border-blue-500 bg-blue-50 shadow-sm' : 'border-gray-100 bg-white hover:border-gray-200'}">
+                            <span class="text-2xl mb-1">🏡</span>
+                            <span class="font-bold text-sm ${userProfile.housing === 'own' ? 'text-blue-700' : 'text-gray-600'}">Owning</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <p class="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">Lifestyle Settings</p>
+                    <div class="space-y-2">
+                        <label class="flex items-center justify-between p-3 rounded-2xl border-2 ${userProfile.hasCar ? 'border-blue-500 bg-blue-50' : 'border-gray-100 bg-white'} transition-colors cursor-pointer" onclick="toggleProfile('hasCar')">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm text-lg border border-gray-50">🚗</div>
+                                <div class="font-bold text-gray-800 text-sm">Vehicle & Tolls</div>
+                            </div>
+                            <div class="w-5 h-5 rounded-full border-2 ${userProfile.hasCar ? 'border-blue-500 bg-blue-500' : 'border-gray-300'} flex items-center justify-center transition-colors">
+                                ${userProfile.hasCar ? '<span class="text-white text-xs font-bold">✓</span>' : ''}
+                            </div>
+                        </label>
+
+                        <label class="flex items-center justify-between p-3 rounded-2xl border-2 ${userProfile.hasKids ? 'border-blue-500 bg-blue-50' : 'border-gray-100 bg-white'} transition-colors cursor-pointer" onclick="toggleProfile('hasKids')">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm text-lg border border-gray-50">🍼</div>
+                                <div class="font-bold text-gray-800 text-sm">Children & School</div>
+                            </div>
+                            <div class="w-5 h-5 rounded-full border-2 ${userProfile.hasKids ? 'border-blue-500 bg-blue-500' : 'border-gray-300'} flex items-center justify-center transition-colors">
+                                ${userProfile.hasKids ? '<span class="text-white text-xs font-bold">✓</span>' : ''}
+                            </div>
+                        </label>
+
+                        <label class="flex items-center justify-between p-3 rounded-2xl border-2 ${userProfile.hasPets ? 'border-blue-500 bg-blue-50' : 'border-gray-100 bg-white'} transition-colors cursor-pointer" onclick="toggleProfile('hasPets')">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm text-lg border border-gray-50">🐾</div>
+                                <div class="font-bold text-gray-800 text-sm">Pets Registration</div>
+                            </div>
+                            <div class="w-5 h-5 rounded-full border-2 ${userProfile.hasPets ? 'border-blue-500 bg-blue-500' : 'border-gray-300'} flex items-center justify-center transition-colors">
+                                ${userProfile.hasPets ? '<span class="text-white text-xs font-bold">✓</span>' : ''}
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="absolute bottom-0 left-0 w-full p-6 bg-gradient-to-t from-white via-white to-transparent">
+                <button id="generate-btn" onclick="enterDashboard()" class="w-full py-4 rounded-xl bg-blue-600 text-white font-bold shadow-lg shadow-blue-200 active:scale-95 transition-transform flex items-center justify-center gap-2 hover:bg-blue-700">
+                    <span>Generate Checklist</span>
+                    <span class="bg-blue-800/40 px-2.5 py-0.5 rounded-md text-sm ${countChangedClass}" id="task-counter">
+                        ${currentTaskCount} Tasks
+                    </span>
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function renderDashboard() {
+    const filteredTasks = getFilteredTasks();
+    const completedCount = filteredTasks.filter(t => t.Is_Completed).length;
+    const totalCount = filteredTasks.length;
+    const progressPercent = totalCount === 0 ? 0 : Math.round((completedCount / totalCount) * 100);
+
+    const grouped = filteredTasks.reduce((acc, task) => {
+        (acc[task.Category] = acc[task.Category] || []).push(task);
+        return acc;
+    }, {});
+
+    const categories = Object.keys(grouped);
+    if (!appState.activeCategory || !grouped[appState.activeCategory]) {
+        appState.activeCategory = categories[0] || null;
+    }
+
+    const mainAppTitle = userProfile.localData ? `Move to ${userProfile.localData.Suburb_Name}` : 'My Relocation';
+    const subAppTitle = userProfile.localData ? `Postcode ${userProfile.postcode}` : 'Relocation Dashboard';
+
+    let sidebarHtml = `
+        <div class="bg-white p-6 border-b md:border-b-0 md:border-r border-gray-100 flex flex-col h-full">
+            <div class="flex justify-between items-center mb-6">
+                <div class="pr-2">
+                    <h1 class="text-xl md:text-2xl font-bold text-gray-800 leading-tight">${mainAppTitle}</h1>
+                    <p class="text-xs text-gray-400 mt-1">${subAppTitle}</p>
+                </div>
+                <button onclick="goToOnboarding()" class="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-colors flex-shrink-0">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                    Edit
+                </button>
+            </div>
+
+            <div class="bg-gray-50 p-4 rounded-2xl mb-4 border border-gray-100">
+                <div class="flex justify-between text-xs mb-1.5 font-medium text-gray-700">
+                    <span>Overall Progress</span>
+                    <span class="text-blue-600 font-bold">${progressPercent}%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2 mb-1.5">
+                    <div class="bg-blue-500 h-2 rounded-full transition-all duration-700" style="width: ${progressPercent}%"></div>
+                </div>
+                <p class="text-[11px] text-gray-400">${completedCount} / ${totalCount} tasks completed</p>
+            </div>
+
+            <div class="flex-1 overflow-y-auto space-y-2 pr-1">
+    `;
+
+    for (const [category, tasks] of Object.entries(grouped)) {
+        const catCompleted = tasks.filter(t => t.Is_Completed).length;
+        const iconUrl = iconMap[category] || 'https://img.icons8.com/office/80/todo-list.png';
+        const displayName = categoryDisplayMap[category] || category;
+        const isAllDone = catCompleted === tasks.length;
+        const isActive = appState.activeCategory === category;
+
+        sidebarHtml += `
+            <div onclick="selectCategory('${category}')" class="p-3.5 rounded-xl border flex items-center cursor-pointer transition-all ${isActive ? 'bg-blue-50/80 border-blue-200 shadow-sm' : 'bg-white border-gray-100 hover:bg-gray-50'}">
+                <div class="w-10 h-10 bg-gray-50 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
+                    <img src="${iconUrl}" class="w-6 h-6 icon-pastel" alt="${displayName}">
+                </div>
+                <div class="flex-1 min-w-0">
+                    <h3 class="font-bold text-sm text-gray-800 truncate ${isAllDone ? 'text-gray-400' : ''}">${displayName}</h3>
+                    <p class="text-xs text-gray-400">${catCompleted} / ${tasks.length} done</p>
+                </div>
+                <div class="text-gray-300 ml-2 hidden md:block">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </div>
+            </div>
+        `;
+    }
+    sidebarHtml += `</div></div>`;
+
+    let activeCategoryName = appState.activeCategory;
+    let activeDisplayName = categoryDisplayMap[activeCategoryName] || activeCategoryName;
+    let activeIconUrl = iconMap[activeCategoryName] || 'https://img.icons8.com/office/80/todo-list.png';
+    
+    let activeTasks = getFilteredTasks()
+        .filter(t => t.Category === activeCategoryName)
+        .sort((a, b) => (a.Is_Completed === b.Is_Completed) ? 0 : a.Is_Completed ? 1 : -1);
+
+    let mainContentHtml = `
+        <div class="flex flex-col h-full bg-white">
+            <div class="p-4 md:p-6 border-b border-gray-100 bg-white/90 backdrop-blur-sm z-10 flex items-center justify-between">
+                <div class="flex items-center">
+                    <button onclick="backToCategories()" class="p-2 -ml-2 text-gray-500 hover:text-gray-800 rounded-full hover:bg-gray-100 transition-colors md:hidden mr-2">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
+                    </button>
+                    <img src="${activeIconUrl}" class="w-8 h-8 icon-pastel mr-3 hidden md:block" alt="${activeDisplayName}">
+                    <div>
+                        <h2 class="text-lg md:text-2xl font-bold text-gray-800">${activeDisplayName}</h2>
+                        <p class="text-xs text-gray-400">Manage tasks and requirements for this category</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex-1 p-4 md:p-6 overflow-y-auto space-y-3 pb-12">
+    `;
+
+    if (activeTasks.length === 0) {
+        mainContentHtml += `<div class="text-center py-12 text-gray-400 text-sm">No tasks available for this category based on your profile.</div>`;
+    } else {
+        activeTasks.forEach(task => {
+            const isChecked = task.Is_Completed ? 'checked' : '';
+            const safeOrgName = task.Org_Name.replace(/'/g, "\\'");
+            const cardBg = task.Is_Completed ? 'bg-gray-50/70 border-gray-100 opacity-80' : 'bg-white border-gray-100 shadow-sm hover:border-gray-200';
+            const titleColor = task.Is_Completed ? 'text-gray-400 font-medium' : 'text-gray-800 font-bold';
+            
+            const processedTitle = processTemplate(task.Org_Name);
+            const processedUrl = processTemplate(task.Action_Url);
+            const processedTips = processTemplate(task.Tips);
+
+            const actionButtonHtml = processedUrl && processedUrl !== '#' ? `
+                <div class="mt-3">
+                    <a href="${processedUrl}" target="_blank" onclick="event.stopPropagation()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-xs rounded-lg transition-colors border border-blue-100">
+                        <span>${task.Button_Label || 'Take Action'}</span>
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                    </a>
+                </div>
+            ` : '';
+
+            mainContentHtml += `
+                <div class="flex items-start p-4 rounded-2xl cursor-pointer transition-all border ${cardBg}" onclick="toggleTask('${safeOrgName}', ${task.Is_Completed})">
+                    <div class="flex-1 pr-4">
+                        <div class="${titleColor} text-base md:text-lg leading-tight mb-1">${processedTitle}</div>
+                        <div class="text-xs font-medium px-2 py-0.5 bg-gray-100/80 text-gray-500 rounded-md inline-block mb-2">
+                            ${task.Priority} • ${task.Tag || 'General'}
+                        </div>
+                        ${processedTips ? `<p class="text-xs md:text-sm text-gray-400 leading-snug">${processedTips}</p>` : ''}
+                        ${actionButtonHtml}
+                    </div>
+                    <div class="pt-1" onclick="event.stopPropagation()">
+                        <input type="checkbox" onchange="toggleTask('${safeOrgName}', ${task.Is_Completed})" class="checkbox-custom w-7 h-7 rounded-full appearance-none border-2 border-gray-300 checked:bg-blue-500 flex-shrink-0 cursor-pointer relative after:content-['✓'] after:absolute after:text-white after:font-bold after:text-lg after:left-[5px] after:-top-[1px] after:hidden checked:after:block shadow-sm" ${isChecked}>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    mainContentHtml += `</div></div>`;
+
+    return `
+        <div class="flex flex-col md:flex-row h-full w-full overflow-hidden">
+            <div class="w-full h-full md:hidden ${appState.mobileView === 'categories' ? 'block' : 'hidden'}">
+                ${sidebarHtml}
+            </div>
+            <div class="w-full h-full md:hidden ${appState.mobileView === 'tasks' ? 'block' : 'hidden'}">
+                ${mainContentHtml}
+            </div>
+            <div class="hidden md:w-80 md:flex md:flex-shrink-0 h-full">
+                ${sidebarHtml}
+            </div>
+            <div class="hidden md:flex md:flex-1 h-full overflow-hidden">
+                ${mainContentHtml}
+            </div>
+        </div>
+        <style>
+            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        </style>
+    `;
+}
+
+// 核心功能：实时同步输入框的值
+window.updatePostcode = function(value) {
+    userProfile.postcode = value;
+};
+
+window.setHousing = function(type) {
+    if (userProfile.housing !== type) {
+        userProfile.housing = type;
+        render();
+    }
+};
+
+window.toggleProfile = function(key) {
+    userProfile[key] = !userProfile[key];
+    render(); 
+};
+
+window.enterDashboard = async function() {
+    const postcode = document.getElementById('postcode-input').value;
+    if (!postcode || postcode.length !== 4) {
+        alert('Please enter a valid 4-digit Victorian postcode (e.g., 3018).');
+        return;
+    }
+
+    const btn = document.getElementById('generate-btn');
+    btn.innerHTML = 'Loading local data...';
+
+    userProfile.postcode = postcode;
+    userProfile.localData = await fetchLocalData(postcode);
+
+    appState.view = 'dashboard';
+    appState.mobileView = 'categories';
+    appState.activeCategory = null;
+    render();
+};
+
+window.goToOnboarding = function() {
+    appState.view = 'onboarding';
+    render();
+};
+
+window.selectCategory = function(categoryName) {
+    appState.activeCategory = categoryName;
+    appState.mobileView = 'tasks';
+    render();
+};
+
+window.backToCategories = function() {
+    appState.mobileView = 'categories';
+    render();
+};
+
+window.toggleTask = async function(orgName, currentStatus) {
+    const newStatus = !currentStatus;
+    
+    userProgressMap[orgName] = newStatus;
+    render();
+
+    const { error } = await supabaseClient
+        .from('user_progress')
+        .upsert({ 
+            user_id: currentUserId, 
+            org_name: orgName, 
+            is_completed: newStatus,
+            updated_at: new Date()
+        }, { onConflict: 'user_id,org_name' });
+
+    if (error) {
+        console.error('Sync failed:', error);
+        userProgressMap[orgName] = currentStatus;
+        render();
+        alert('Failed to sync progress with cloud. Please check your network.');
+    }
+}
+
+initApp();
+</script>
+</body>
+</html>
