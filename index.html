@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VIC Move Assistant</title>
+    <!-- Commission Factory Verification Meta Tag -->
     <meta name="commission-factory-verification" content="3fb8e154e2854327b0ca7cd9afa38062" />
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -28,7 +29,7 @@
             <h2 class="text-lg font-semibold text-slate-900 mb-2">Enter Your New Postcode</h2>
             <p class="text-sm text-slate-500 mb-4">Provide your Victorian postcode to automatically load your local council and tailored moving tasks.</p>
             <div class="flex gap-3">
-                <input type="text" id="postcode-input" placeholder="e.g. 3018" maxlength="4" 
+                <input type="text" id="postcode-input" placeholder="e.g. 3018 or 3012" maxlength="4" 
                     class="flex-grow px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-lg">
                 <button onclick="handlePostcodeSubmit()" 
                     class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 py-2 rounded-lg transition-colors shadow-sm">
@@ -53,10 +54,9 @@
     <!-- Application Script -->
     <script>
         // Supabase Initialization Configuration
-        const SUPABASE_URL = 'YOUR_SUPABASE_URL'; // Will use your existing active instance configuration
+        const SUPABASE_URL = 'YOUR_SUPABASE_URL'; 
         const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
         
-        // Initialize client if configured, otherwise provide mock safety fallback
         let supabaseClient = null;
         try {
             if (typeof supabase !== 'undefined' && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
@@ -104,38 +104,46 @@
             containerEl.innerHTML = '';
 
             try {
-                // Simulation / Supabase Fetch Routing
-                // In production, queries VIC_Local_Data dictionary and Master_Directory
-                let councilName = "Hobsons Bay City Council"; // Default fallback match for 3018
-                if (postcode !== '3018') {
-                    councilName = `Local Council for ${postcode}`;
+                // Postcode logic mapping for Western Suburbs & Victoria
+                let councilName = "Hobsons Bay City Council"; 
+                if (postcode === '3012') {
+                    councilName = "Maribyrnong City Council (Maidstone)";
+                } else if (postcode !== '3018') {
+                    councilName = `Local Council for Postcode ${postcode}`;
                 }
                 userProfile.council = councilName;
 
                 statusEl.innerHTML = `<span class="text-green-600 font-semibold">Matched Council:</span> ${councilName}`;
 
-                // Render Master Tasks with dynamic local mappings
+                // Render structured tasks with clean icons
                 renderChecklist([
                     {
                         id: 'council_update',
                         title: `Notify ${councilName} of Change of Address`,
-                        category: 'Local Council',
+                        category: '🏛️ Local Council',
                         description: 'Update your household details for local waste collection services, animal registrations, and council rates.',
                         action_url: 'https://www.hobsonsbay.vic.gov.au'
                     },
                     {
                         id: 'vicroads_update',
                         title: 'Update Driver Licence & Vehicle Registration',
-                        category: 'State Government',
+                        category: '🚗 State Government',
                         description: 'Update your residential address with VicRoads within 14 days of moving.',
                         action_url: 'https://www.vicroads.vic.gov.au/licences/manage-your-licence/update-address'
                     },
                     {
                         id: 'toll_update',
                         title: 'Update Toll Accounts (Linkt)',
-                        category: 'Transport & Tolls',
+                        category: '🛣️ Transport & Tolls',
                         description: 'Ensure your Linkt or other toll accounts are updated to avoid unexpected toll fines.',
                         action_url: 'https://www.linkt.com.au/help/accounts-billing/update-contact-details'
+                    },
+                    {
+                        id: 'nbn_update',
+                        title: 'Relocate Internet & NBN Services',
+                        category: '⚡ Utilities & NBN',
+                        description: 'Contact your ISP at least 2 weeks prior to arrange NBN activation at your new address.',
+                        action_url: '#'
                     }
                 ]);
 
