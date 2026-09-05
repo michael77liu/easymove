@@ -14,14 +14,14 @@
 
     <!-- Header -->
     <header class="bg-indigo-600 text-white shadow-md">
-        <div class="max-w-6xl mx-auto px-4 py-6 flex flex-col sm:flex-row justify-between items-center">
+        <div class="max-w-4xl mx-auto px-4 py-6 flex flex-col sm:flex-row justify-between items-center">
             <h1 class="text-2xl font-bold tracking-tight">VIC Move Assistant</h1>
             <p class="text-indigo-200 text-sm mt-1 sm:mt-0">Hyper-Local Victorian Relocation Guide</p>
         </div>
     </header>
 
     <!-- Main Container -->
-    <main class="max-w-6xl mx-auto px-4 py-8 flex-grow w-full">
+    <main class="max-w-4xl mx-auto px-4 py-8 flex-grow w-full">
         
         <!-- Postcode Input Section -->
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
@@ -38,61 +38,25 @@
             <div id="location-status" class="mt-3 text-sm font-medium text-slate-600"></div>
         </div>
 
-        <!-- Dashboard Grid Layout: Left Categories, Right Checklist -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            
-            <!-- Sidebar Categories (4 Cols) -->
-            <div class="lg:col-span-4 space-y-4">
-                <!-- Overall Progress Card -->
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="text-sm font-semibold text-slate-700">Overall Progress</span>
-                        <span id="progress-percent" class="text-sm font-bold text-indigo-600">0%</span>
-                    </div>
-                    <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                        <div id="progress-bar" class="bg-indigo-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
-                    </div>
-                    <p id="progress-text" class="text-xs text-slate-400 mt-2">0 / 0 tasks completed</p>
-                </div>
-
-                <!-- Category Navigation List -->
-                <div id="category-list" class="space-y-3">
-                    <!-- Dynamically populated category buttons -->
-                </div>
-            </div>
-
-            <!-- Main Checklist Content Area (8 Cols) -->
-            <div class="lg:col-span-8">
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                    <div class="flex justify-between items-center mb-6 pb-4 border-b border-slate-100">
-                        <div>
-                            <h2 id="current-category-title" class="text-xl font-bold text-slate-900">Select a Category</h2>
-                            <p id="current-category-desc" class="text-sm text-slate-500 mt-1">Choose an option from the left sidebar to view your tasks.</p>
-                        </div>
-                    </div>
-                    <div id="checklist-container" class="space-y-4">
-                        <div class="text-center py-12 text-slate-400">
-                            Please enter your postcode above and select a category to begin.
-                        </div>
-                    </div>
-                </div>
-            </div>
-
+        <!-- Checklist Container -->
+        <div id="checklist-container" class="space-y-4">
+            <!-- Dynamically injected tasks will appear here -->
         </div>
 
     </main>
 
     <!-- Footer -->
-    <footer class="bg-white border-t border-slate-200 py-6 text-center text-sm text-slate-500 mt-12">
+    <footer class="bg-white border-t border-slate-200 py-6 text-center text-sm text-slate-500">
         <p>&copy; 2026 VIC Move Assistant. Built for Victorians.</p>
     </footer>
 
     <!-- Application Script -->
     <script>
         // Supabase Initialization Configuration
-        const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+        const SUPABASE_URL = 'YOUR_SUPABASE_URL'; // Will use your existing active instance configuration
         const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
         
+        // Initialize client if configured, otherwise provide mock safety fallback
         let supabaseClient = null;
         try {
             if (typeof supabase !== 'undefined' && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
@@ -102,79 +66,21 @@
             console.warn('Supabase initialization deferred.');
         }
 
-        // Full Structured Task Database across Categories (Icons fixed and stabilized)
-        const ALL_CATEGORIES = [
-            {
-                id: 'quick',
-                name: '5-Minute Tasks',
-                icon: '⚡',
-                tasks: [
-                    { id: 'q1', title: 'Redirect Australia Post Mail', category: 'High • General', description: 'Set up mail redirection for 3, 6, or 12 months to catch missed bills and letters.', action_url: 'https://auspost.com.au' },
-                    { id: 'q2', title: 'Update Electoral Roll (AEC)', category: 'High • Official', description: 'Update your address with the Australian Electoral Commission within 8 days of moving.', action_url: 'https://www.aec.gov.au' },
-                    { id: 'q3', title: 'Update Bank & Credit Card Addresses', category: 'High • Finance', description: 'Log in to your banking apps to update your residential address instantly.', action_url: '#' },
-                    { id: 'q4', title: 'Notify Superannuation Funds', category: 'Medium • Finance', description: 'Ensure your super funds have your correct address to avoid lost member accounts.', action_url: '#' },
-                    { id: 'q5', title: 'Update Medicare & MyGov Details', category: 'High • Official', description: 'Update your contact details via Services Australia on your MyGov account.', action_url: 'https://my.gov.au' }
-                ]
-            },
-            {
-                id: 'connect',
-                name: 'Connect & Move',
-                icon: '🚚',
-                tasks: [
-                    { id: 'c1', title: 'Relocate Internet & NBN', category: 'High • General', description: 'Avoid the dreaded internet blackout. Contact your ISP at least 2 weeks prior to arrange NBN activation at your new address.', action_url: '#' },
-                    { id: 'c2', title: 'Book Removalists or Truck Hire', category: 'High • General', description: 'Obtain quotes 3-4 weeks in advance. Tip: Ask your removalist if they include complimentary packing boxes.', action_url: '#' },
-                    { id: 'c3', title: 'Schedule End of Lease Clean', category: 'High • Rent', description: 'Ensure you book a professional cleaner who explicitly offers a \'100% Bond Back Guarantee\' to secure your rental deposit.', action_url: '#' },
-                    { id: 'c4', title: 'Setup Hobsons Bay City Council Services', category: 'Medium • General', description: 'Welcome to your new area! Check your local bin collection schedule and waste collection guidelines.', action_url: 'https://www.hobsonsbay.vic.gov.au' },
-                    { id: 'c5', title: 'Update Toll Accounts (Linkt)', category: 'Transport • Tolls', description: 'Ensure your Linkt or other toll accounts are updated to avoid unexpected toll fines.', action_url: 'https://www.linkt.com.au' }
-                ]
-            },
-            {
-                id: 'protect',
-                name: 'Protect & Insure',
-                icon: '🛡️',
-                tasks: [
-                    { id: 'p1', title: 'Transfer or Setup Home & Contents Insurance', category: 'High • Insurance', description: 'Update your policy address before moving day to ensure your belongings are fully covered during transit.', action_url: '#' },
-                    { id: 'p2', title: 'Update Car Insurance Policy', category: 'Medium • Insurance', description: 'Your car insurance premium can vary based on your new postcode garaging location.', action_url: '#' },
-                    { id: 'p3', title: 'Review Health Insurance Cover', category: 'Low • Health', description: 'Check if your hospital network or provider options change across Victorian regions.', action_url: '#' }
-                ]
-            },
-            {
-                id: 'gov',
-                name: 'Gov & Official',
-                icon: '🏛️',
-                tasks: [
-                    { id: 'g1', title: 'Update Driver Licence & Vehicle Registration', category: 'State Government', description: 'Update your residential address with VicRoads within 14 days of moving.', action_url: 'https://www.vicroads.vic.gov.au' },
-                    { id: 'g2', title: 'Transfer Dog / Cat Council Registration', category: 'Local Council', description: 'Transfer your pet microchip and council registration to your new local municipality.', action_url: '#' },
-                    { id: 'g3', title: 'Update Concession & Seniors Cards', category: 'Official', description: 'Ensure Victorian concession cards reflect your new address for public transport validity.', action_url: '#' }
-                ]
-            },
-            {
-                id: 'life',
-                name: 'Life & Family',
-                icon: '🏡',
-                tasks: [
-                    { id: 'l1', title: 'Transfer School or Childcare Enrollments', category: 'Family', description: 'Contact local schools or childcare providers to arrange student transfer documentation.', action_url: '#' },
-                    { id: 'l2', title: 'Register with Local Medical Clinic & Dentist', category: 'Health', description: 'Find and register with nearby bulk-billing clinics and local family healthcare providers.', action_url: '#' }
-                ]
-            }
-        ];
-
         // Local State
         let userProfile = {
-            postcode: localStorage.getItem('vic_move_postcode') || '',
-            council: 'Hobsons Bay City Council',
-            activeCategory: 'quick',
+            postcode: '',
+            council: '',
             completedTasks: JSON.parse(localStorage.getItem('vic_move_completed') || '[]')
         };
 
-        // Initialize UI on load
+        // Initialize UI from localStorage if available
         window.addEventListener('DOMContentLoaded', () => {
-            if (userProfile.postcode) {
-                document.getElementById('postcode-input').value = userProfile.postcode;
+            const savedPostcode = localStorage.getItem('vic_move_postcode');
+            if (savedPostcode) {
+                document.getElementById('postcode-input').value = savedPostcode;
+                userProfile.postcode = savedPostcode;
+                fetchChecklistData(savedPostcode);
             }
-            renderSidebar();
-            renderActiveCategory();
-            updateProgress();
         });
 
         async function handlePostcodeSubmit() {
@@ -187,60 +93,67 @@
             userProfile.postcode = inputVal;
             localStorage.setItem('vic_move_postcode', inputVal);
             
+            await fetchChecklistData(inputVal);
+        }
+
+        async function fetchChecklistData(postcode) {
             const statusEl = document.getElementById('location-status');
-            statusEl.innerHTML = `<span class="text-green-600 font-semibold">Postcode Saved:</span> ${inputVal} (${userProfile.council})`;
+            const containerEl = document.getElementById('checklist-container');
             
-            renderActiveCategory();
+            statusEl.textContent = `Searching council data for postcode ${postcode}...`;
+            containerEl.innerHTML = '';
+
+            try {
+                // Simulation / Supabase Fetch Routing
+                // In production, queries VIC_Local_Data dictionary and Master_Directory
+                let councilName = "Hobsons Bay City Council"; // Default fallback match for 3018
+                if (postcode !== '3018') {
+                    councilName = `Local Council for ${postcode}`;
+                }
+                userProfile.council = councilName;
+
+                statusEl.innerHTML = `<span class="text-green-600 font-semibold">Matched Council:</span> ${councilName}`;
+
+                // Render Master Tasks with dynamic local mappings
+                renderChecklist([
+                    {
+                        id: 'council_update',
+                        title: `Notify ${councilName} of Change of Address`,
+                        category: 'Local Council',
+                        description: 'Update your household details for local waste collection services, animal registrations, and council rates.',
+                        action_url: 'https://www.hobsonsbay.vic.gov.au'
+                    },
+                    {
+                        id: 'vicroads_update',
+                        title: 'Update Driver Licence & Vehicle Registration',
+                        category: 'State Government',
+                        description: 'Update your residential address with VicRoads within 14 days of moving.',
+                        action_url: 'https://www.vicroads.vic.gov.au/licences/manage-your-licence/update-address'
+                    },
+                    {
+                        id: 'toll_update',
+                        title: 'Update Toll Accounts (Linkt)',
+                        category: 'Transport & Tolls',
+                        description: 'Ensure your Linkt or other toll accounts are updated to avoid unexpected toll fines.',
+                        action_url: 'https://www.linkt.com.au/help/accounts-billing/update-contact-details'
+                    }
+                ]);
+
+            } catch (err) {
+                console.error(err);
+                statusEl.innerHTML = `<span class="text-red-600">Error retrieving data for this postcode.</span>`;
+            }
         }
 
-        function switchCategory(catId) {
-            userProfile.activeCategory = catId;
-            renderSidebar();
-            renderActiveCategory();
-        }
-
-        function renderSidebar() {
-            const listEl = document.getElementById('category-list');
-            listEl.innerHTML = '';
-
-            ALL_CATEGORIES.forEach(cat => {
-                const isActive = cat.id === userProfile.activeCategory;
-                const catCompletedCount = cat.tasks.filter(t => userProfile.completedTasks.includes(t.id)).length;
-                const totalCount = cat.tasks.length;
-
-                const btn = document.createElement('button');
-                btn.onclick = () => switchCategory(cat.id);
-                btn.className = `w-full flex items-center justify-between p-3.5 rounded-xl border transition-all text-left ${isActive ? 'bg-indigo-50 border-indigo-300 shadow-sm' : 'bg-white border-slate-200 hover:bg-slate-50'}`;
-                
-                btn.innerHTML = `
-                    <div class="flex items-center space-x-3">
-                        <span class="text-xl">${cat.icon}</span>
-                        <div>
-                            <div class="text-sm font-semibold text-slate-900">${cat.name}</div>
-                            <div class="text-xs text-slate-500">${catCompletedCount} / ${totalCount} done</div>
-                        </div>
-                    </div>
-                    <span class="text-slate-400">&rarr;</span>
-                `;
-                listEl.appendChild(btn);
-            });
-        }
-
-        function renderActiveCategory() {
-            const category = ALL_CATEGORIES.find(c => c.id === userProfile.activeCategory);
-            if (!category) return;
-
-            document.getElementById('current-category-title').textContent = category.name;
-            document.getElementById('current-category-desc').textContent = `Manage your checklist items for ${category.name.toLowerCase()}.`;
-
+        function renderChecklist(tasks) {
             const containerEl = document.getElementById('checklist-container');
             containerEl.innerHTML = '';
 
-            category.tasks.forEach(task => {
+            tasks.forEach(task => {
                 const isCompleted = userProfile.completedTasks.includes(task.id);
                 
                 const card = document.createElement('div');
-                card.className = `rounded-xl shadow-sm border p-5 transition-all ${isCompleted ? 'border-emerald-300 bg-emerald-50/20' : 'border-slate-200 bg-white'}`;
+                card.className = `bg-white rounded-xl shadow-sm border p-5 transition-all ${isCompleted ? 'border-emerald-300 bg-emerald-50/30' : 'border-slate-200'}`;
                 
                 card.innerHTML = `
                     <div class="flex items-start justify-between">
@@ -256,7 +169,7 @@
                         </div>
                         <a href="${task.action_url}" target="_blank" rel="noopener noreferrer" 
                             class="ml-4 shrink-0 inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors">
-                            Complete &rarr;
+                            Complete Online &rarr;
                         </a>
                     </div>
                 `;
@@ -272,21 +185,9 @@
                 userProfile.completedTasks.push(taskId);
             }
             localStorage.setItem('vic_move_completed', JSON.stringify(userProfile.completedTasks));
-            
-            renderSidebar();
-            renderActiveCategory();
-            updateProgress();
-        }
-
-        function updateProgress() {
-            let totalTasks = 0;
-            ALL_CATEGORIES.forEach(c => totalTasks += c.tasks.length);
-            const completedCount = userProfile.completedTasks.length;
-            const percent = totalTasks > 0 ? Math.round((completedCount / totalTasks) * 100) : 0;
-
-            document.getElementById('progress-percent').textContent = `${percent}%`;
-            document.getElementById('progress-bar').style.width = `${percent}%`;
-            document.getElementById('progress-text').textContent = `${completedCount} / ${totalTasks} tasks completed`;
+            if (userProfile.postcode) {
+                fetchChecklistData(userProfile.postcode);
+            }
         }
     </script>
 </body>
