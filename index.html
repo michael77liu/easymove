@@ -187,7 +187,6 @@ function renderOnboarding() {
                 <div>
                     <p class="text-sm font-bold text-gray-400 mb-2 uppercase tracking-wider">Moving To (Postcode)</p>
                     <div class="relative">
-                        <!-- 核心修复：增加了 oninput 事件，实时同步用户的输入到状态库 -->
                         <input type="number" id="postcode-input" value="${userProfile.postcode}" oninput="updatePostcode(this.value)" placeholder="e.g. 3018" class="w-full text-lg p-4 rounded-2xl border-2 border-gray-200 focus:border-blue-500 focus:ring-0 outline-none transition-colors font-bold text-gray-700 bg-white shadow-sm">
                         <div class="absolute right-4 top-4 text-gray-300">VIC</div>
                     </div>
@@ -356,7 +355,8 @@ function renderDashboard() {
     } else {
         activeTasks.forEach(task => {
             const isChecked = task.Is_Completed ? 'checked' : '';
-            const safeOrgName = task.Org_Name.replace(/'/g, "\\'");
+            // 核心修复：添加对双引号的严格 HTML 实体转义
+            const safeOrgName = task.Org_Name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
             const cardBg = task.Is_Completed ? 'bg-gray-50/70 border-gray-100 opacity-80' : 'bg-white border-gray-100 shadow-sm hover:border-gray-200';
             const titleColor = task.Is_Completed ? 'text-gray-400 font-medium' : 'text-gray-800 font-bold';
             
@@ -414,7 +414,6 @@ function renderDashboard() {
     `;
 }
 
-// 核心功能：实时同步输入框的值
 window.updatePostcode = function(value) {
     userProfile.postcode = value;
 };
