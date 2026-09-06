@@ -63,7 +63,8 @@ const categoryDisplayMap = {
 const iconMap = {
     'Quick Wins': 'https://img.icons8.com/office/80/timer.png',
     'Connect': 'https://img.icons8.com/office/80/truck.png',
-    'Insurance': 'https://img.icons8.com/office/80/shield.png',
+    // 核心修复：更换为稳定有效的 color 风格盾牌图标
+    'Insurance': 'https://img.icons8.com/color/80/shield.png',
     'Government': 'https://img.icons8.com/office/80/museum.png',
     'Lifestyle': 'https://img.icons8.com/office/80/family.png'
 };
@@ -302,7 +303,8 @@ function renderDashboard() {
 
     for (const [category, tasks] of Object.entries(grouped)) {
         const catCompleted = tasks.filter(t => t.Is_Completed).length;
-        const iconUrl = iconMap[category] || 'https://img.icons8.com/office/80/todo-list.png';
+        // 核心修复：更新了 fallback 图标，确保未识别分类也能正常显示
+        const iconUrl = iconMap[category] || 'https://img.icons8.com/color/80/task.png';
         const displayName = categoryDisplayMap[category] || category;
         const isAllDone = catCompleted === tasks.length;
         const isActive = appState.activeCategory === category;
@@ -326,7 +328,8 @@ function renderDashboard() {
 
     let activeCategoryName = appState.activeCategory;
     let activeDisplayName = categoryDisplayMap[activeCategoryName] || activeCategoryName;
-    let activeIconUrl = iconMap[activeCategoryName] || 'https://img.icons8.com/office/80/todo-list.png';
+    // 核心修复：同样在此处更新 fallback 图标
+    let activeIconUrl = iconMap[activeCategoryName] || 'https://img.icons8.com/color/80/task.png';
     
     let activeTasks = getFilteredTasks()
         .filter(t => t.Category === activeCategoryName)
@@ -355,7 +358,6 @@ function renderDashboard() {
     } else {
         activeTasks.forEach(task => {
             const isChecked = task.Is_Completed ? 'checked' : '';
-            // 核心修复：添加对双引号的严格 HTML 实体转义
             const safeOrgName = task.Org_Name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
             const cardBg = task.Is_Completed ? 'bg-gray-50/70 border-gray-100 opacity-80' : 'bg-white border-gray-100 shadow-sm hover:border-gray-200';
             const titleColor = task.Is_Completed ? 'text-gray-400 font-medium' : 'text-gray-800 font-bold';
